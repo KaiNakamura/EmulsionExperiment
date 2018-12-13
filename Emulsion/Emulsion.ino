@@ -44,15 +44,16 @@ int SERVO_POS = 100;
 
 void setup() {
   Serial.begin(9600);
-  
+  Serial.println("Init");
   Wire.begin();
-  setupMPU();
+//  setupMPU();
 
   pinMode(RELAY_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
 }
 
 void loop() {
+  Serial.println("Loop");
   // Record data
   recordAccelRegisters();
   recordGyroRegisters();
