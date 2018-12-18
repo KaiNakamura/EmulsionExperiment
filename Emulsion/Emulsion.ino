@@ -1,35 +1,93 @@
 /*
-Accelerometer code from
+ * A microgravity experiment studying the behavior of emulsified liquids.
+ * This code autonomously mixes an emulsion when an accelerometer is triggered.
+ * 
+ === Wiring map ===
+  Accelerometer
+    VCC -> 5V
+    GND -> GND
+    SCL -> A5
+    SDA -> A4
+    XDA ->
+    XCL ->
+    ADO ->
+    INT -> 2
 
-===Contact & Support===
-Website: http://eeenthusiast.com/
-Youtube: https://www.youtube.com/EEEnthusiast
-Facebook: https://www.facebook.com/EEEnthusiast/
-Patreon: https://www.patreon.com/EE_Enthusiast
-Revision: 1.0 (July 13th, 2016)
-===Hardware===
-- Arduino Uno R3
-- MPU-6050 (Available from: http://eeenthusiast.com/product/6dof-mpu-6050-accelerometer-gyroscope-temperature/)
-===Software===
-- Latest Software: https://github.com/VRomanov89/EEEnthusiast/tree/master/MPU-6050%20Implementation/MPU6050_Implementation
-- Arduino IDE v1.6.9
-- Arduino Wire library
-===Terms of use===
-The software is provided by EEEnthusiast without warranty of any kind. In no event shall the authors or 
-copyright holders be liable for any claim, damages or other liability, whether in an action of contract, 
-tort or otherwise, arising from, out of or in connection with the software or the use or other dealings in 
-the software.
+  LED
+    + -> 13
+    - -> DIGITAL GND
+  
+  Relay
+    VCC -> 5V
+    GND -> GND
+    SIG -> RELAY_PIN
+  
+  Servo
+    VCC -> 5V
+    GND -> GND
+    SIG -> SERVO_PIN
+
+  Limit Switch
+    VCC -> 5V
+    GND -> GND
+    SIG -> LIMIT_SWITCH_PIN
+
+  RaspberryPi
+    RASP_PI_PIN -> RaspberryPi GPIO pin # _____ TODO: find pin number 
+ ================
+
+Accelerometer code from:
+  === Contact & Support ===
+  Website: http://eeenthusiast.com/
+  Youtube: https://www.youtube.com/EEEnthusiast
+  Facebook: https://www.facebook.com/EEEnthusiast/
+  Patreon: https://www.patreon.com/EE_Enthusiast
+  Revision: 1.0 (July 13th, 2016)
+  === Hardware ===
+  - Arduino Uno R3
+  - MPU-6050 (Available from: http://eeenthusiast.com/product/6dof-mpu-6050-accelerometer-gyroscope-temperature/)
+  === Software ===
+  - Latest Software: https://github.com/VRomanov89/EEEnthusiast/tree/master/MPU-6050%20Implementation/MPU6050_Implementation
+  - Arduino IDE v1.6.9
+  - Arduino Wire library
+  === Terms of use ===
+  The software is provided by EEEnthusiast without warranty of any kind. In no event shall the authors or 
+  copyright holders be liable for any claim, damages or other liability, whether in an action of contract, 
+  tort or otherwise, arising from, out of or in connection with the software or the use or other dealings in 
+  the software.
 */
 
 #include <Wire.h>
 #include <Servo.h>
 Servo servo;
 
-// Electrical pins
-int RELAY_PIN = 13;
-int SERVO_PIN = 7;
+// === Constants ===
 
-// Gyro
+// Electrical pins
+#define LED_PIN 13
+#define RELAY_PIN 12
+#define SERVO_PIN 7
+#define LIMIT_SWITCH_PIN 3
+
+// Timing
+#define DELAY_TIME 1000 // ms, time in between taking force data, prevents starting from just a quick jolt
+#define LED_MIX_BLINK_TIME 250 // ms, time it takes for LED to blink during mix
+#define LED_COOLDOWN_BLINK_TIME 1000 // ms, time it takes for LED to blink during cooldown
+#define LED_ACTION_BLINK_TIME 50 // ms, time it takes for LED to blink during an action
+#define LED_ACTION_DURATION 300 // ms, time it takes to complete action blinking
+#define COOLDOWN_TIME 10000 // ms, time to prevent mixing multiple times in a row
+#define MIX_TIME 10000 // ms
+
+// Servo
+#define SERVO_POS 100 // degrees
+
+// Activation
+#define MINIMUM_FORCE 0.5 // g, The minimum acceptable force before experiment starts
+
+// RaspberryPi
+#define RASP_PI_PIN 8
+
+// === Gyro ====
 long accelX, accelY, accelZ;
 float gForceX, gForceY, gForceZ;
 
@@ -37,42 +95,40 @@ long gyroX, gyroY, gyroZ;
 float rotX, rotY, rotZ;
 
 boolean inFall = false;
-int DELAY_TIME = 1000; // time in between taking force data, prevents starting from just a quick jolt
-int COOLDOWN_TIME = 10000; // time to prevent mixing multiple times in a row
-int MIX_TIME = 10000; // ms
-int SERVO_POS = 100;
+
+// === LED ===
+boolean ledState = LOW;
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("Init");
+  
   Wire.begin();
-//  setupMPU();
+  setupMPU();
 
+  pinMode(LED_PIN, OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
 }
 
 void loop() {
-  Serial.println("Loop");
   // Record data
   recordAccelRegisters();
   recordGyroRegisters();
 
-  // Set if falling
+  // Print force
   Serial.println("Force: " + String(gForceZ));
-  
-  if(gForceZ <= 0.5)
-  {
-    inFall = true;
-  }
-  else
-  {
-    inFall = false;
-  }
 
-  if(inFall)
-  {
+  // Set if falling
+  inFall = gForceZ <= MINIMUM_FORCE;
+
+  if(inFall) {
+    // === Mixing sequence ===
+
+    // Send signal to pi
+    digitalWrite(RASP_PI_PIN, HIGH);
+    
     // Move servo out of the way
+    delayBlinkAction();
     Serial.println("Moving servo out of way");
     servo.write(0);
     delay(1000);
@@ -80,30 +136,52 @@ void loop() {
     // Start motor
     Serial.println("Begin mixing for " + String(MIX_TIME / 1000.0) + "s.");
     digitalWrite(RELAY_PIN, HIGH);
-    delay(MIX_TIME);
+
+    // Wait for MIX_TIME and blink LED
+    delayBlink(MIX_TIME, LED_MIX_BLINK_TIME);
+
+    // Turn off LED
+    ledState = LOW;
+    digitalWrite(LED_PIN, ledState);
+
+    while (true) {
+      // Stop motor
+      digitalWrite(RELAY_PIN, LOW);
+      delay(500);
+  
+      // Move in servo
+      delayBlinkAction();
+      Serial.println("Moving servo to stop motor");
+      servo.write(SERVO_POS);
+      delay(1000);
+      
+      // Spin motor until upright
+      Serial.println("Rotating motor");
+      digitalWrite(RELAY_PIN, HIGH);
+      delay(500);
+      
+      if (switchIsPressed()) break;
+      else {
+        Serial.println("Bottle not upright! Spinning again");
+  
+        // Move servo out of the way
+        delayBlinkAction();
+        Serial.println("Moving servo out of way");
+        servo.write(0);
+        delay(1000);
+      }
+    }
 
     // Stop motor
     digitalWrite(RELAY_PIN, LOW);
-    delay(500);
 
-    // Move in servo
-    Serial.println("Moving servo to stop motor");
-    servo.write(SERVO_POS);
-    delay(1000);
-    
-    // Spin motor until upright
-    digitalWrite(RELAY_PIN, HIGH);
-    delay(500);
-
-    // Stop motor
-    digitalWrite(RELAY_PIN, LOW);
-
-    // Begin cooldown
+    // Begin cooldown and blink LED
     Serial.println("Begin cooldown for " + String(COOLDOWN_TIME / 1000.0) + "s.");
-    delay(COOLDOWN_TIME);
-  }
-  else
-  {
+    delayBlink(COOLDOWN_TIME, LED_COOLDOWN_BLINK_TIME);
+  } else {
+    // Do when not in fall
+    digitalWrite(RASP_PI_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
     servo.write(SERVO_POS);
     digitalWrite(RELAY_PIN, LOW);
   }
@@ -111,7 +189,36 @@ void loop() {
   delay(DELAY_TIME);
 }
 
-void setupMPU(){
+boolean switchIsPressed() {
+  return digitalRead(LIMIT_SWITCH_PIN) == LOW; // Pressing switch 
+}
+
+void delayBlink(double delayTime, double blinkTime) {
+  ledState = HIGH;
+  double timeRemaining = delayTime;
+  for (int i = 0; i < delayTime; i += blinkTime) {
+    // Set LED
+    digitalWrite(LED_PIN, ledState);
+    
+    // Wait
+    (timeRemaining > blinkTime) ? delay(blinkTime) : delay(timeRemaining);
+    
+    timeRemaining -= blinkTime;
+    
+    // Toggle state
+    (ledState == HIGH) ? ledState = LOW : ledState = HIGH;
+   }
+   
+  // Turn off LED
+  ledState = LOW;
+  digitalWrite(LED_PIN, ledState);
+}
+
+void delayBlinkAction() {
+  delayBlink(LED_ACTION_DURATION, LED_ACTION_BLINK_TIME);
+}
+
+void setupMPU() {
   Wire.beginTransmission(0b1101000); //This is the I2C address of the MPU (b1101000/b1101001 for AC0 low/high datasheet sec. 9.2)
   Wire.write(0x6B); //Accessing the register 6B - Power Management (Sec. 4.28)
   Wire.write(0b00000000); //Setting SLEEP register to 0. (Required; see Note on p. 9)
