@@ -33,7 +33,7 @@
     SIG -> LIMIT_SWITCH_PIN
 
   RaspberryPi
-    RASP_PI_PIN -> RaspberryPi GPIO pin # _____ TODO: find pin number 
+    RASPPI_PIN -> RaspberryPi GPIO 27
  ================
 
 Accelerometer code from:
@@ -85,7 +85,7 @@ Servo servo;
 #define MINIMUM_FORCE 0.5 // g, The minimum acceptable force before experiment starts
 
 // RaspberryPi
-#define RASP_PI_PIN 8
+#define RASPPI_PIN 8
 
 // === Gyro ====
 long accelX, accelY, accelZ;
@@ -107,6 +107,7 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
+  pinMode(RASPI_PIN, OUTPUT);
   servo.attach(SERVO_PIN);
 }
 
