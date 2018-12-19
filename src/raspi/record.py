@@ -17,7 +17,7 @@ try:
             camera.stop_recording()
             camera.stop_preview()
             os.system("cd /home/pi/Desktop/Repos/EmulsionExperiment/video")
-            os.system("Mp4Box -add video.h264 video.mp4")
+            os.system("MP4Box -add video.h264 video.mp4")
         sleep(0.5)
 finally:
     GPIO.cleanup()
