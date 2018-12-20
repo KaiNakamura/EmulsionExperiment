@@ -85,7 +85,7 @@ Servo servo;
 #define MINIMUM_FORCE 0.5 // g, The minimum acceptable force before experiment starts
 
 // RaspberryPi
-#define RASPPI_PIN 8
+#define RASPI_PIN 8
 
 // === Gyro ====
 long accelX, accelY, accelZ;
@@ -126,7 +126,7 @@ void loop() {
     // === Mixing sequence ===
 
     // Send signal to pi
-    digitalWrite(RASP_PI_PIN, HIGH);
+    digitalWrite(RASPI_PIN, HIGH);
     
     // Move servo out of the way
     delayBlinkAction();
@@ -181,7 +181,7 @@ void loop() {
     delayBlink(COOLDOWN_TIME, LED_COOLDOWN_BLINK_TIME);
   } else {
     // Do when not in fall
-    digitalWrite(RASP_PI_PIN, LOW);
+    digitalWrite(RASPI_PIN, LOW);
     digitalWrite(LED_PIN, LOW);
     servo.write(SERVO_POS);
     digitalWrite(RELAY_PIN, LOW);
