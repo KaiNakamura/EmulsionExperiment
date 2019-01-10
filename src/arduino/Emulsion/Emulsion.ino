@@ -75,7 +75,7 @@ Servo servo;
 #define LED_COOLDOWN_BLINK_TIME 1000 // ms, time it takes for LED to blink during cooldown
 #define LED_ACTION_BLINK_TIME 50 // ms, time it takes for LED to blink during an action
 #define LED_ACTION_DURATION 300 // ms, time it takes to complete action blinking
-#define COOLDOWN_TIME 10000 // ms, time to prevent mixing multiple times in a row
+#define COOLDOWN_TIME 45000 // ms, time to prevent mixing multiple times in a row
 #define MIX_TIME 10000 // ms
 
 // Servo
