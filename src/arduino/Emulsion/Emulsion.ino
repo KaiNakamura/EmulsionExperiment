@@ -179,6 +179,7 @@ void loop() {
     // Begin cooldown and blink LED
     Serial.println("Begin cooldown for " + String(COOLDOWN_TIME / 1000.0) + "s.");
     delayBlink(COOLDOWN_TIME, LED_COOLDOWN_BLINK_TIME);
+    Serial.println("Cooldown finished");
   } else {
     // Do when not in fall
     digitalWrite(RASPI_PIN, LOW);
