@@ -1,0 +1,1 @@
+Videos will appear with .h264 extension, play them with vlc player
