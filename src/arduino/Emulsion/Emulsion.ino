@@ -69,6 +69,9 @@ Servo servo;
 #define SERVO_PIN 7
 #define LIMIT_SWITCH_PIN 3
 
+// RaspberryPi
+#define RASPI_PIN 8
+
 // Timing
 #define DELAY_TIME 1000 // ms, time in between taking force data, prevents starting from just a quick jolt
 #define LED_MIX_BLINK_TIME 250 // ms, time it takes for LED to blink during mix
@@ -83,9 +86,6 @@ Servo servo;
 
 // Activation
 #define MINIMUM_FORCE 0.5 // g, The minimum acceptable force before experiment starts
-
-// RaspberryPi
-#define RASPI_PIN 8
 
 // === Gyro ====
 long accelX, accelY, accelZ;
@@ -124,12 +124,14 @@ void loop() {
 
   if(inFall) {
     // === Mixing sequence ===
-
+  
+    delayBlinkAction();
+    digitalWrite(LED_PIN, HIGH);
+    
     // Send signal to pi
     digitalWrite(RASPI_PIN, HIGH);
     
     // Move servo out of the way
-    delayBlinkAction();
     Serial.println("Moving servo out of way");
     servo.write(0);
     delay(1000);
@@ -138,12 +140,8 @@ void loop() {
     Serial.println("Begin mixing for " + String(MIX_TIME / 1000.0) + "s.");
     digitalWrite(RELAY_PIN, HIGH);
 
-    // Wait for MIX_TIME and blink LED
-    delayBlink(MIX_TIME, LED_MIX_BLINK_TIME);
-
-    // Turn off LED
-    ledState = LOW;
-    digitalWrite(LED_PIN, ledState);
+    // Wait for MIX_TIME
+    delay(MIX_TIME);
 
     while (true) {
       // Stop motor
@@ -151,7 +149,6 @@ void loop() {
       delay(500);
   
       // Move in servo
-      delayBlinkAction();
       Serial.println("Moving servo to stop motor");
       servo.write(SERVO_POS);
       delay(1000);
@@ -166,7 +163,6 @@ void loop() {
         Serial.println("Bottle not upright! Spinning again");
   
         // Move servo out of the way
-        delayBlinkAction();
         Serial.println("Moving servo out of way");
         servo.write(0);
         delay(1000);
@@ -178,8 +174,10 @@ void loop() {
 
     // Begin cooldown and blink LED
     Serial.println("Begin cooldown for " + String(COOLDOWN_TIME / 1000.0) + "s.");
-    delayBlink(COOLDOWN_TIME, LED_COOLDOWN_BLINK_TIME);
+    delay(COOLDOWN_TIME);
     Serial.println("Cooldown finished");
+
+    digitalWrite(LED_PIN, LOW);
   } else {
     // Do when not in fall
     digitalWrite(RASPI_PIN, LOW);
